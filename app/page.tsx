@@ -10,11 +10,13 @@ export default function Page() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [basePath, setBasePath] = useState<string | null>(null);
 
   async function onAnalyze(projectPath: string, libraryName: string) {
     setBusy(true);
     setError(null);
     setResult(null);
+    setBasePath(projectPath);
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
@@ -43,7 +45,7 @@ export default function Page() {
       <AnalyzerForm onAnalyze={onAnalyze} busy={busy} />
       <Separator />
       {error && <div className="text-red-600 text-sm">{error}</div>}
-      {result && <ResultsTable result={result} />}
+      {result && <ResultsTable result={result} basePath={basePath ?? undefined} />}
     </main>
   );
 }

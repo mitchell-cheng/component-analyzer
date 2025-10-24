@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import type { AnalysisResult, ComponentSummary } from '@/lib/analyzer/types';
 import { InstancesAccordion } from './InstancesAccordion';
 
-export function ResultsTable({ result }: { result: AnalysisResult }) {
+export function ResultsTable({ result, basePath }: { result: AnalysisResult; basePath?: string }) {
   if (result.components.length === 0) {
     return <div className="text-sm text-muted-foreground">No components from "{result.libraryName}" found.</div>;
   }
@@ -31,7 +31,7 @@ export function ResultsTable({ result }: { result: AnalysisResult }) {
               <TableCell className="align-top">
                 <div className="font-medium">{summary.component}</div>
                 <div className="mt-2">
-                  <InstancesAccordion instances={instances} />
+                  <InstancesAccordion instances={instances} basePath={basePath} />
                 </div>
               </TableCell>
               <TableCell className="align-top">{summary.total}</TableCell>

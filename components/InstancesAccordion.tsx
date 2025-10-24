@@ -2,16 +2,19 @@
 
 import {
   Accordion,
-  AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
-import type { ComponentInstance } from "@/lib/analyzer/types";
+  AccordionContent,
+} from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
+import type { ComponentInstance } from '@/lib/analyzer/types';
 
 export function InstancesAccordion({
   instances,
+  basePath,
 }: {
   instances: ComponentInstance[];
+  basePath?: string;
 }) {
   // Group instances by file and collapse by default
   const byFile = new Map<string, ComponentInstance[]>();
@@ -21,10 +24,37 @@ export function InstancesAccordion({
     byFile.set(inst.file, arr);
   }
 
+  const normalizeBase = (base?: string) => (base ? base.replace(/\/$/, '') : undefined);
+  const base = normalizeBase(basePath);
+  const toRelative = (file: string) => {
+    if (!base) return file;
+    if (file.startsWith(base)) {
+      const rel = file.slice(base.length);
+      return rel.startsWith('/') ? rel.slice(1) : rel || '.';
+    }
+    return file;
+  };
+
+  const importVariant = (t: ComponentInstance['importType']) =>
+    t === 'named' || t === 'require-named'
+      ? 'default'
+      : t === 'default' || t === 'require-default'
+      ? 'secondary'
+      : t === 'namespace' || t === 'require-namespace'
+      ? 'outline'
+      : 'destructive';
+
+  const propVariant = (v: string) =>
+    v === 'string' || v === 'template' || v === 'jsx'
+      ? 'secondary'
+      : v === 'number' || v === 'array'
+      ? 'default'
+      : v === 'boolean' || v === 'identifier' || v === 'member'
+      ? 'outline'
+      : 'destructive';
+
   const entries = Array.from(byFile.entries())
-    .map(
-      ([file, list]) => [file, list.sort((a, b) => a.line - b.line)] as const
-    )
+    .map(([file, list]) => [file, list.sort((a, b) => a.line - b.line)] as const)
     .sort((a, b) => a[0].localeCompare(b[0]));
 
   return (
@@ -32,39 +62,36 @@ export function InstancesAccordion({
       {entries.map(([file, list]) => (
         <AccordionItem key={file} value={file}>
           <AccordionTrigger>
-            <span className="text-left">
-              {file} • {list.length} usage{list.length === 1 ? "" : "s"}
-            </span>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{list.length} usage{list.length === 1 ? '' : 's'}</Badge>
+              <span className="font-mono text-sm">{toRelative(file)}</span>
+            </div>
           </AccordionTrigger>
           <AccordionContent>
             <div className="space-y-3">
               {list.map((inst, idx) => (
-                <div
-                  key={`${inst.file}-${inst.line}-${idx}`}
-                  className="space-y-1"
-                >
-                  <div className="text-sm">
-                    Line {inst.line}
-                    {inst.endLine && inst.endLine !== inst.line
-                      ? `-${inst.endLine}`
-                      : ""}{" "}
-                    • {inst.importType}
+                <div key={`${inst.file}-${inst.line}-${idx}`} className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap text-sm">
+                    <Badge variant="default">
+                      Line {inst.line}{inst.endLine && inst.endLine !== inst.line ? `-${inst.endLine}` : ''}
+                    </Badge>
+                    <Badge variant={importVariant(inst.importType)}>
+                      {inst.importType}
+                    </Badge>
+                    {inst.parentComponent && (
+                      <Badge variant="outline">parent: {inst.parentComponent}</Badge>
+                    )}
                   </div>
-                  <div>
-                    <span className="font-medium">Parent:</span>{" "}
-                    {inst.parentComponent ?? "—"}
-                  </div>
-                  <div className="font-medium">Props:</div>
-                  <ul className="list-disc ml-6">
-                    {inst.props.length === 0 && <li>None</li>}
+                  <div className="text-sm font-medium mt-2">Props:</div>
+                  <div className="flex flex-wrap gap-2 ml-1">
+                    {inst.props.length === 0 && <span className="text-muted-foreground">None</span>}
                     {inst.props.map((p, i) => (
-                      <li key={i}>
-                        <span className="font-medium">{p.name}</span> (
-                        {p.valueType})
-                        {p.valuePreview ? `: ${p.valuePreview}` : ""}
-                      </li>
+                      <div key={i} className="flex items-center gap-2">
+                        <Badge variant={propVariant(p.valueType)}>{p.name}</Badge>
+                        <Badge variant="outline">{p.valueType}</Badge>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               ))}
             </div>
