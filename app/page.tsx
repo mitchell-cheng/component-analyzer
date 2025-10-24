@@ -2,7 +2,7 @@
 
 import { AnalyzerForm } from "@/components/AnalyzerForm";
 import { CodemodPanel } from "@/components/CodemodPanel";
-import { ResultsTable } from "@/components/ResultsTable";
+import { ResultsTable } from '@/components/ResultsTable';
 import { Separator } from "@/components/ui/separator";
 import type { AnalysisResult } from "@/lib/analyzer/types";
 import { useState } from "react";
