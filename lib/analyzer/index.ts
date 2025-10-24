@@ -12,6 +12,7 @@ import traverse from '@babel/traverse';
 import * as t from '@babel/types';
 import fs from 'fs/promises';
 import pLimit from 'p-limit';
+import { loadCache, saveCache, getProjectLibCache, setProjectLibCacheEntry } from './cache';
 
 function summarize(instances: ComponentInstance[]) {
   const byComponent = new Map<string, ComponentInstance[]>();
@@ -65,9 +66,36 @@ export async function analyzeProject(req: AnalyzerRequest): Promise<AnalysisResu
   let excludedFiles = 0;
   const allInstances: ComponentInstance[] = [];
 
+  const cache = await loadCache();
+  const projLibCache = getProjectLibCache(cache, req.projectPath, req.libraryName);
+
   await Promise.all(
     files.map((file) =>
       limit(async () => {
+        let stat;
+        try {
+          stat = await fs.stat(file);
+        } catch {
+          excludedFiles += 1;
+          return;
+        }
+        const mtimeMs = stat.mtimeMs;
+
+        // cache hit
+        const cached = projLibCache[file];
+        if (cached && cached.mtimeMs === mtimeMs) {
+          const reparseEmpty = process.env.ANALYZER_CACHE_REPARSE_EMPTY !== 'false';
+          if (cached.instances.length > 0) {
+            allInstances.push(...cached.instances);
+            return;
+          }
+          if (!reparseEmpty) {
+            return;
+          }
+          // Fall through to re-parse to avoid stale empty entries from older analyzer versions
+        }
+
+        // parse fresh
         let code: string;
         try {
           code = await fs.readFile(file, 'utf8');
@@ -103,6 +131,11 @@ export async function analyzeProject(req: AnalyzerRequest): Promise<AnalysisResu
 
         const importMap = collectImportsForLibrary(ast, req.libraryName);
         const instances = collectUsageFromAst(ast, code, file, importMap);
+        // write back cache
+        setProjectLibCacheEntry(cache, req.projectPath, req.libraryName, file, {
+          mtimeMs,
+          instances,
+        });
         if (instances.length > 0) {
           allInstances.push(...instances);
         }
@@ -111,6 +144,7 @@ export async function analyzeProject(req: AnalyzerRequest): Promise<AnalysisResu
   );
 
   const components = summarize(allInstances);
+  await saveCache(cache);
 
   return {
     libraryName: req.libraryName,

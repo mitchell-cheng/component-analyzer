@@ -11,17 +11,36 @@ export default function Page() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [basePath, setBasePath] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
 
-  async function onAnalyze(projectPath: string, libraryName: string) {
+  async function onAnalyze(projectPath: string, libraryName: string, includePatterns?: string[], excludePatterns?: string[]) {
     setBusy(true);
     setError(null);
     setResult(null);
     setBasePath(projectPath);
+
     try {
+      setProgress('Scanning files…');
+      const prevRes = await fetch('/api/analyze/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectPath, includePatterns, excludePatterns }),
+      });
+      const prevJson = await prevRes.json();
+      if (!prevRes.ok) {
+        setError(prevJson?.error ?? 'Preview failed');
+        setBusy(false);
+        setProgress(null);
+        return;
+      }
+
+      const count = prevJson.count as number;
+      setProgress(`Analyzing ${count} files…`);
+
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectPath, libraryName }),
+        body: JSON.stringify({ projectPath, libraryName, includePatterns, excludePatterns }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -33,6 +52,7 @@ export default function Page() {
       setError(e?.message ?? 'Unknown error');
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -44,6 +64,7 @@ export default function Page() {
       </p>
       <AnalyzerForm onAnalyze={onAnalyze} busy={busy} />
       <Separator />
+      {progress && <div className="text-sm text-muted-foreground">{progress}</div>}
       {error && <div className="text-red-600 text-sm">{error}</div>}
       {result && <ResultsTable result={result} basePath={basePath ?? undefined} />}
     </main>

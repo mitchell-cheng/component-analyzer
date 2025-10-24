@@ -59,6 +59,66 @@ function slicePreview(code: string, node?: t.Node | null): string | undefined {
   }
 }
 
+function resolveExpressionValueType(
+  contextPath: NodePath,
+  expr: t.Node | null | undefined,
+  depth = 0,
+): PropValueType {
+  if (!expr || depth > 3) return 'unknown';
+  if (!t.isExpression(expr)) return detectValueType(expr);
+  // direct
+  const direct = detectValueType(expr);
+  if (direct !== 'identifier' && direct !== 'member') return direct;
+
+  // identifier -> trace binding init
+  if (t.isIdentifier(expr)) {
+    const binding = contextPath.scope.getBinding(expr.name);
+    if (binding && binding.path.isVariableDeclarator()) {
+      const init = binding.path.node.init || null;
+      if (init) {
+        // recurse
+        return resolveExpressionValueType(contextPath, init as t.Expression, depth + 1);
+      }
+    }
+    return 'identifier';
+  }
+
+  // member -> object literal property
+  if (t.isMemberExpression(expr)) {
+    if (t.isIdentifier(expr.object)) {
+      const binding = contextPath.scope.getBinding(expr.object.name);
+      if (binding && binding.path.isVariableDeclarator()) {
+        const init = binding.path.node.init;
+        if (init && t.isObjectExpression(init)) {
+          const keyName = t.isIdentifier(expr.property)
+            ? expr.property.name
+            : t.isStringLiteral(expr.property)
+            ? expr.property.value
+            : null;
+          if (keyName) {
+            for (const prop of init.properties) {
+              if (t.isObjectProperty(prop)) {
+                const k =
+                  t.isIdentifier(prop.key)
+                    ? prop.key.name
+                    : t.isStringLiteral(prop.key)
+                    ? prop.key.value
+                    : null;
+                if (k === keyName) {
+                  return resolveExpressionValueType(contextPath, prop.value as t.Expression, depth + 1);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return 'member';
+  }
+
+  return direct;
+}
+
 export function collectUsageFromAst(
   ast: t.File,
   code: string,
@@ -124,7 +184,7 @@ export function collectUsageFromAst(
             const expr = attr.value.expression;
             props.push({
               name: propName,
-              valueType: detectValueType(expr),
+              valueType: resolveExpressionValueType(path, expr),
               valuePreview: slicePreview(code, expr),
             });
           } else {

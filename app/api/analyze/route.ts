@@ -9,6 +9,8 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Partial<AnalyzerRequest>;
     const projectPathInput = body.projectPath?.trim();
     const libraryName = body.libraryName?.trim();
+    const includePatterns = body.includePatterns;
+    const excludePatterns = body.excludePatterns;
 
     if (!projectPathInput || !libraryName) {
       return NextResponse.json(
@@ -17,10 +19,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Local-only guard: block in production unless whitelisted
+    if (process.env.NODE_ENV === 'production' && process.env.ANALYZER_ALLOW_IN_PROD !== 'true') {
+      return NextResponse.json(
+        { error: 'Analyzer disabled in production. Set ANALYZER_ALLOW_IN_PROD=true to enable.' },
+        { status: 403 },
+      );
+    }
+
     const projectPath =
       path.isAbsolute(projectPathInput)
         ? projectPathInput
         : path.join(process.cwd(), projectPathInput);
+    // optional whitelist restricts accessible paths
+    const whitelist = process.env.ANALYZER_PATH_WHITELIST?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
+    if (whitelist.length > 0 && !whitelist.some((base) => projectPath.startsWith(base))) {
+      return NextResponse.json(
+        { error: 'Project path not in whitelist.' },
+        { status: 403 },
+      );
+    }
 
     try {
       await fs.access(projectPath);
@@ -34,17 +52,18 @@ export async function POST(req: NextRequest) {
     const result = await analyzeProject({
       projectPath,
       libraryName,
-      // You can tweak patterns to include/exclude certain folders
-      includePatterns: ['**/*.{js,jsx,ts,tsx}'],
-      excludePatterns: [
-        '**/node_modules/**',
-        '**/.next/**',
-        '**/dist/**',
-        '**/build/**',
-        '**/out/**',
-        '**/coverage/**',
-        '**/*.d.ts',
-      ],
+      includePatterns: includePatterns && includePatterns.length ? includePatterns : ['**/*.{js,jsx,ts,tsx}'],
+      excludePatterns: excludePatterns && excludePatterns.length
+        ? excludePatterns
+        : [
+            '**/node_modules/**',
+            '**/.next/**',
+            '**/dist/**',
+            '**/build/**',
+            '**/out/**',
+            '**/coverage/**',
+            '**/*.d.ts',
+          ],
     });
 
     return NextResponse.json(result);

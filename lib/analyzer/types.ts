@@ -5,7 +5,11 @@ export type ImportType =
   | "side-effect"
   | "require-named"
   | "require-default"
-  | "require-namespace";
+  | "require-namespace"
+  | "dynamic-named"
+  | "dynamic-default"
+  | "dynamic-namespace"
+  | "re-export";
 
 export interface ImportDetail {
   importType: ImportType;
@@ -17,6 +21,7 @@ export interface ImportMap {
   locals: Record<string, ImportDetail>;
   sources: Set<string>;
   hasSideEffectImport: boolean;
+  reExports?: Set<string>;
 }
 
 export type PropValueType =

@@ -10,10 +10,28 @@ export function ResultsTable({ result, basePath }: { result: AnalysisResult; bas
     return <div className="text-sm text-muted-foreground">No components from "{result.libraryName}" found.</div>;
   }
 
+  function downloadJson() {
+    const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `component-analyzer-${result.libraryName}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6">
-      <div className="text-sm text-muted-foreground">
-        Scanned {result.scannedFiles} files, excluded {result.excludedFiles}. Took {result.durationMs} ms.
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Scanned {result.scannedFiles} files, excluded {result.excludedFiles}. Took {result.durationMs} ms.
+        </div>
+        <button
+          className="text-sm underline hover:opacity-80"
+          onClick={downloadJson}
+        >
+          Download JSON
+        </button>
       </div>
       <Table>
         <TableHeader>
