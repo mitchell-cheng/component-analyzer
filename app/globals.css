@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "diff2html/bundles/css/diff2html.min.css";
 
 @custom-variant dark (&:is(.dark *));
 

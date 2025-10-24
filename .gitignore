@@ -55,3 +55,6 @@ playwright-report/
 
 # storybook build output
 storybook-static/
+
+# cache
+.cache/
