@@ -58,7 +58,8 @@ export function InstancesAccordion({
     .sort((a, b) => a[0].localeCompare(b[0]));
 
   return (
-    <Accordion type="multiple" collapsible className="w-full">
+    <Accordion type="multiple" className="w-full">
+      {/* grouped-by-file items remain collapsed by default */}
       {entries.map(([file, list]) => (
         <AccordionItem key={file} value={file}>
           <AccordionTrigger>
